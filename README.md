@@ -30,3 +30,11 @@ Requires the Godot 4.7.2 export templates (Editor > Manage Export Templates). Th
 ```
 
 This produces `export/linux/AngryHerds.x86_64` and `export/windows/AngryHerds.exe`. Each is a single self-contained file.
+
+## Download
+
+Prebuilt Linux and Windows executables are on the [Releases page](https://github.com/DocFoxHound/AngryHerds/releases).
+
+## License
+
+MIT, see [LICENSE](LICENSE). Built with [Godot Engine](https://godotengine.org) (also MIT).
