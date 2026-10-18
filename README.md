@@ -20,3 +20,13 @@ godot --path .            # or: flatpak run org.godotengine.Godot --path .
 - `scenes/main.tscn` is the entry scene
 - `scripts/main.gd` builds the level, HUD and win/lose logic
 - `scripts/slingshot.gd`, `animal.gd`, `wolf.gd`, `block.gd`, `destructible.gd`
+
+## Building
+
+Requires the Godot 4.7.2 export templates (Editor > Manage Export Templates). Then:
+
+```
+./build.sh
+```
+
+This produces `export/linux/AngryHerds.x86_64` and `export/windows/AngryHerds.exe`. Each is a single self-contained file.
