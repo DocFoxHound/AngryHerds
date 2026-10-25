@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fb3ef"/>
+      <stop offset="1" stop-color="#a8ddf7"/>
+    </linearGradient>
+    <radialGradient id="wool" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e4e0d6"/>
+    </radialGradient>
+    <radialGradient id="face" cx="0.45" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#fff6ea"/>
+      <stop offset="1" stop-color="#ead7bf"/>
+    </radialGradient>
+    <clipPath id="tile"><rect width="512" height="512" rx="112"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <!-- Clouds -->
+    <g fill="#ffffff" opacity="0.7">
+      <circle cx="70" cy="92" r="26"/><circle cx="104" cy="80" r="34"/><circle cx="140" cy="94" r="24"/>
+    </g>
+    <!-- Hills -->
+    <ellipse cx="120" cy="560" rx="300" ry="160" fill="#4f9e33"/>
+    <ellipse cx="440" cy="540" rx="260" ry="130" fill="#62b43f"/>
+
+    <!-- Slingshot behind the sheep -->
+    <g stroke="#6b3f1a" stroke-linecap="round" fill="none">
+      <path d="M436 500 L436 372" stroke-width="28"/>
+      <path d="M436 384 L404 314" stroke-width="22"/>
+      <path d="M436 384 L470 314" stroke-width="22"/>
+    </g>
+    <path d="M404 316 Q380 300 352 300" stroke="#4a1e12" stroke-width="11" fill="none" stroke-linecap="round"/>
+    <path d="M470 316 Q420 330 360 318" stroke="#4a1e12" stroke-width="11" fill="none" stroke-linecap="round"/>
+
+    <!-- Wool -->
+    <g fill="url(#wool)" stroke="#bdb6a6" stroke-width="5">
+      <circle cx="160" cy="168" r="58"/><circle cx="236" cy="132" r="62"/><circle cx="318" cy="160" r="58"/>
+      <circle cx="356" cy="236" r="56"/><circle cx="338" cy="318" r="58"/><circle cx="262" cy="362" r="60"/>
+      <circle cx="180" cy="350" r="58"/><circle cx="120" cy="286" r="58"/><circle cx="118" cy="212" r="54"/>
+      <circle cx="240" cy="250" r="130" stroke="none"/>
+    </g>
+
+    <!-- Ears -->
+    <ellipse cx="128" cy="236" rx="46" ry="24" fill="#d9c3a6" stroke="#8c6f50" stroke-width="5" transform="rotate(-20 128 236)"/>
+    <ellipse cx="352" cy="236" rx="46" ry="24" fill="#d9c3a6" stroke="#8c6f50" stroke-width="5" transform="rotate(20 352 236)"/>
+
+    <!-- Face -->
+    <ellipse cx="240" cy="262" rx="98" ry="110" fill="url(#face)" stroke="#8c6f50" stroke-width="6"/>
+
+    <!-- Eyes -->
+    <ellipse cx="200" cy="236" rx="30" ry="32" fill="#ffffff" stroke="#3a2a1a" stroke-width="5"/>
+    <ellipse cx="280" cy="236" rx="30" ry="32" fill="#ffffff" stroke="#3a2a1a" stroke-width="5"/>
+    <circle cx="210" cy="246" r="14" fill="#1a1a1a"/>
+    <circle cx="270" cy="246" r="14" fill="#1a1a1a"/>
+    <circle cx="214" cy="241" r="4.5" fill="#ffffff"/>
+    <circle cx="274" cy="241" r="4.5" fill="#ffffff"/>
+
+    <!-- Angry brows -->
+    <path d="M160 190 L232 222" stroke="#2b1a0e" stroke-width="20" stroke-linecap="round"/>
+    <path d="M320 190 L248 222" stroke="#2b1a0e" stroke-width="20" stroke-linecap="round"/>
+
+    <!-- Muzzle -->
+    <ellipse cx="240" cy="322" rx="44" ry="32" fill="#f3d2c4" stroke="#b98a72" stroke-width="5"/>
+    <path d="M222 306 Q240 300 258 306 Q252 322 240 326 Q228 322 222 306 Z" fill="#4a2a1e"/>
+    <!-- Grumpy mouth -->
+    <path d="M240 326 L240 336 M220 346 Q230 334 240 336 Q250 334 260 346" stroke="#4a2a1e" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

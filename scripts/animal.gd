@@ -50,7 +50,17 @@ var stampede_time := 0.0
 var pounding := false
 var fuse := -1.0
 var last_speed := 0.0
-var mood := "angry"
+var last_velocity := Vector2.ZERO
+## Animation: seconds alive, blinks, impatient hops while waiting in line, and the springy
+## squash after a bump (seconds since it, how hard, and which way in the animal's own frame).
+var anim_time := 0.0
+var blink_left := 0.0
+var blink_timer := 0.0
+var hop := 0.0
+var hop_timer := 0.0
+var squash_time := -1.0
+var squash_amount := 0.0
+var squash_dir := 0.0
 
 
 func _ready() -> void:
@@ -76,6 +86,9 @@ func _ready() -> void:
 	material.friction = 0.8
 	physics_material_override = material
 	set_collidable(not display_only)
+	anim_time = randf() * 10.0
+	blink_timer = randf_range(1.0, 4.0)
+	hop_timer = randf_range(1.5, 5.0)
 
 
 func set_collidable(on: bool) -> void:
@@ -181,6 +194,14 @@ func sink(lava: bool) -> void:
 func _on_body_entered(body: Node) -> void:
 	if flight_time < 0.0:
 		return
+	if last_speed > 200.0:
+		squash_time = 0.0
+		squash_amount = clampf(last_speed / 1400.0, 0.12, 0.38)
+		squash_dir = last_velocity.angle() - rotation
+		if body is StaticBody2D and last_speed > 350.0:
+			Effects.dust(get_parent(), global_position + last_velocity.normalized() * RADIUS * size, squash_amount * 2.5)
+		if last_speed > 900.0:
+			Effects.shake(self, 0.15)
 	if landed_time < 0.0 and body is StaticBody2D:
 		landed_time = 0.0
 		linear_damp = ROLL_DAMP
@@ -203,6 +224,7 @@ func _physics_process(delta: float) -> void:
 	if flight_time < 0.0 or done:
 		return
 	flight_time += delta
+	last_velocity = linear_velocity
 	last_speed = linear_velocity.length()
 	if dash_time > 0.0:
 		dash_time -= delta
@@ -231,16 +253,76 @@ func _physics_process(delta: float) -> void:
 		settled.emit(self)
 
 
+func _process(delta: float) -> void:
+	anim_time += delta
+	blink_left -= delta
+	blink_timer -= delta
+	if blink_timer <= 0.0:
+		blink_timer = randf_range(2.0, 5.0)
+		blink_left = 0.12
+	if flight_time < 0.0 and collision_layer == 0:
+		hop_timer -= delta
+		if hop_timer <= 0.0:
+			hop_timer = randf_range(2.5, 6.0)
+			hop = 1.0
+	hop = maxf(hop - delta * 3.0, 0.0)
+	if squash_time >= 0.0:
+		squash_time += delta
+		if squash_time > 0.8:
+			squash_time = -1.0
+	if visible:
+		queue_redraw()
+
+
 func _draw() -> void:
 	if dash_time > 0.0:
 		var back := (-linear_velocity.normalized()).rotated(-rotation)
 		for offset: float in [-12.0, 0.0, 12.0]:
 			var start := (back * RADIUS + back.orthogonal() * offset) * size
 			draw_line(start, start + back * (30.0 + absf(offset)) * size, Color(1, 1, 1, clampf(dash_time / 0.6, 0.0, 1.0)), 3.0)
-	Art.animal(self, kind, Vector2.ZERO, size, 0.0, mood)
+	var pose := {"blink": 1.0 if blink_left > 0.0 else 0.0}
+	var face := "angry"
+	var at := Vector2.ZERO
+	if flight_time < 0.0:
+		# Waiting: breathing, eyes on the wolves, the odd hop. Loaded: staring down the target.
+		var breath := sin(anim_time * 3.0) * 0.035
+		pose.squash = Vector2(1.0 - breath, 1.0 + breath)
+		pose.look = Vector2(0.9, -0.25) if collision_layer != 0 else Vector2(0.7, 0.1)
+		at.y = -sin(hop * PI) * 12.0
+	elif landed_time < 0.0:
+		# Flying: stretched along the flight, screaming unless it's charging.
+		var along := linear_velocity.rotated(-rotation)
+		var k := clampf(last_speed / 1600.0, 0.0, 1.0) * 0.22
+		pose.squash = Vector2(1.0 + k, 1.0 - k * 0.6)
+		pose.squash_dir = along.angle()
+		pose.look = along.normalized() * 0.9
+		face = "angry" if dash_time > 0.0 or pounding else "scream"
+	elif landed_time > 0.3:
+		face = "dizzy"
+	if squash_time >= 0.0:
+		var s := squash_amount * exp(-squash_time * 7.0) * cos(squash_time * 26.0)
+		pose.squash = Vector2(1.0 - s, 1.0 + s * 0.8)
+		pose.squash_dir = squash_dir
+	Art.animal(self, kind, at, size, 0.0, face, false, pose)
+	if face == "dizzy":
+		# Stars circling overhead, kept upright while the animal rolls.
+		draw_set_transform(Vector2.ZERO, -rotation)
+		for i in 3:
+			var a := anim_time * 5.0 + TAU * i / 3.0
+			var p := Vector2(cos(a) * 16.0, -RADIUS * size - 6.0 + sin(a) * 5.0) * Vector2(size, 1.0)
+			_star(p, 5.0 if sin(a) > 0.0 else 3.5, Color(1.0, 0.88, 0.2))
 	if fuse > 0.0:
 		draw_set_transform(Vector2.ZERO)
 		draw_circle(Vector2(0, -RADIUS * size - 8.0), 5.0, Color(1.0, 0.3 + 0.5 * absf(sin(fuse * 15.0)), 0.1))
+
+
+func _star(center: Vector2, r: float, color: Color) -> void:
+	var points := PackedVector2Array()
+	for i in 10:
+		points.append(center + Vector2.from_angle(anim_time * 4.0 + i * TAU / 10.0) * (r if i % 2 == 0 else r * 0.45))
+	draw_colored_polygon(points, color)
+	points.append(points[0])
+	draw_polyline(points, Art.OUTLINE, 1.2, true)
 
 
 ## The chicken's egg: bursts on whatever it touches.

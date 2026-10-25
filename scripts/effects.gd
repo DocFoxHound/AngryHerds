@@ -1,13 +1,58 @@
-## Spawns the visual side of destruction: splintering blocks, cartoon poofs, score popups and
-## screen shake. All static: Effects.poof(world, ...).
+## Spawns the visual side of destruction: splintering blocks, cartoon poofs, score popups,
+## screen shake, and freeze frames and slow motion for big hits. All static: Effects.poof(world, ...).
 
 const Debris := preload("res://scripts/debris.gd")
 const Poof := preload("res://scripts/poof.gd")
 const PopupText := preload("res://scripts/popup_text.gd")
 
 
+## Bumped each time the game speed changes, so an older restore doesn't undo a newer change.
+static var _time_token := 0
+
+
 static func shake(node: Node, amount: float) -> void:
 	node.get_tree().call_group("camera_shake", "shake", amount)
+
+
+## A split-second freeze frame that sells a big hit. Skipped during slow motion.
+static func hitstop(node: Node, seconds := 0.06) -> void:
+	if Engine.time_scale < 1.0:
+		return
+	_set_speed(node, 0.05, seconds)
+
+
+## Slows the game down for a dramatic moment (the last wolf), for `seconds` of real time.
+static func slow_motion(node: Node, speed := 0.3, seconds := 0.9) -> void:
+	_set_speed(node, speed, seconds)
+
+
+static func _set_speed(node: Node, speed: float, seconds: float) -> void:
+	_time_token += 1
+	var token := _time_token
+	Engine.time_scale = speed
+	await node.get_tree().create_timer(seconds, true, false, true).timeout
+	if token == _time_token:
+		Engine.time_scale = 1.0
+
+
+## Back to normal speed at once, e.g. when a level starts.
+static func reset_speed() -> void:
+	_time_token += 1
+	Engine.time_scale = 1.0
+
+
+## A kick of dust and grass where something lands hard. amount about 0..1.
+static func dust(world: Node, pos: Vector2, amount: float) -> void:
+	amount = clampf(amount, 0.2, 1.0)
+	var debris := _debris(world)
+	for i in int(6 + amount * 10):
+		var side := -1.0 if i % 2 == 0 else 1.0
+		var vel := Vector2(side * randf_range(60, 260), randf_range(-200, -60)) * (0.6 + amount)
+		debris.add_piece(pos + Vector2(randf_range(-10, 10), 0), vel, _blob(randf_range(4, 9) * (0.6 + amount * 0.6), 7, 0.3),
+			Color(0.82, 0.74, 0.6, 0.75), randf_range(0.5, 0.9), 0.0, 0.0, 0.15, 3.5)
+	for i in int(3 + amount * 5):
+		var vel := Vector2(randf_range(-160, 160), randf_range(-320, -140))
+		debris.add_piece(pos, vel, _sliver(randf_range(5, 9), 2.0), Color(0.36, 0.62, 0.26), randf_range(0.6, 1.0), randf() * TAU, randf_range(-12, 12))
 
 
 static func popup(world: Node, pos: Vector2, text: String, color: Color, font_size := 24) -> void:

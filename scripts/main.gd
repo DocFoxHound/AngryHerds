@@ -54,10 +54,18 @@ var level_top := GROUND_Y
 var rest_position := VIEW_SIZE / 2.0
 var trauma := 0.0
 var trail_tick := 0
+var base_zoom := 1.0
+## Brief zoom-in on big moments, decaying back to 0.
+var zoom_kick := 0.0
+## Things broken by the current shot, for the combo callouts.
+var combo := 0
+## Score popups still on screen: [position, seconds left], so new ones stack instead of overlapping.
+var recent_popups: Array = []
 
 
 func _ready() -> void:
 	add_to_group("camera_shake")
+	Effects.reset_speed()
 	level = Levels.build(Game.current_level)
 	area = Areas.AREAS[level.area]
 	var sky: Array = area.sky
@@ -139,6 +147,11 @@ func _physics_process(_delta: float) -> void:
 func _process(delta: float) -> void:
 	trauma = maxf(trauma - delta * 1.6, 0.0)
 	camera.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 24.0 * trauma * trauma
+	zoom_kick = maxf(zoom_kick - delta * 0.25, 0.0)
+	camera.zoom = Vector2.ONE * base_zoom * (1.0 + zoom_kick)
+	for popup in recent_popups:
+		popup[1] -= delta
+	recent_popups = recent_popups.filter(func(popup: Array) -> bool: return popup[1] > 0.0)
 	# Lean toward the animal in flight, then drift back to the full view of the level.
 	var target := rest_position
 	if is_instance_valid(flier) and not flier.done and flier.flight_time >= 0.0:
@@ -189,6 +202,7 @@ func _build_camera() -> void:
 	var view := VIEW_SIZE / zoom
 	rest_position = Vector2(left + view.x / 2.0, bottom - view.y / 2.0)
 	camera = Camera2D.new()
+	base_zoom = zoom
 	camera.zoom = Vector2.ONE * zoom
 	camera.position = rest_position
 	add_child(camera)
@@ -268,6 +282,7 @@ func _on_launched(animal: Animal) -> void:
 	trail.clear()
 	launched_any = true
 	score_at_launch = score
+	combo = 0
 	hud.show_herd_button(false)
 
 
@@ -303,14 +318,23 @@ func _wolves_laugh() -> void:
 
 
 func _on_block_destroyed(block: Block) -> void:
-	_add_score(block.points, block.global_position, Color(1.0, 0.95, 0.65))
+	_add_score(block.points, block.global_position, Color(1.0, 0.95, 0.65), 20)
 	Effects.shake(self, 0.25 if block.kind in ["stone", "metal"] else 0.12)
+	_count_combo()
 
 
 func _on_wolf_destroyed(wolf: Wolf) -> void:
 	wolves_left -= 1
 	_add_score(wolf.points, wolf.global_position + Vector2(0, -24), Color(1.0, 0.6, 0.2), 34 if not wolf.is_boss else 44)
 	Effects.shake(self, 0.8 if wolf.is_boss else 0.35)
+	_count_combo()
+	if wolves_left == 0 and state == State.PLAYING:
+		# The last wolf goes down in slow motion.
+		Effects.slow_motion(self, 0.3, 1.0)
+		zoom_kick = 0.08
+	else:
+		Effects.hitstop(self, 0.12 if wolf.is_boss else 0.07)
+		zoom_kick = maxf(zoom_kick, 0.03)
 	if wolf == boss:
 		hud.set_boss("", 0.0)
 	if wolves_left == 0 and state == State.PLAYING:
@@ -321,8 +345,30 @@ func _add_score(points: int, pos: Vector2, color: Color, font_size := 24) -> voi
 	if results_shown or state == State.LOST:
 		return
 	score += points
+	# Nudge it up past any popup still showing nearby.
+	var moved := true
+	while moved:
+		moved = false
+		for popup in recent_popups:
+			var other: Vector2 = popup[0]
+			if absf(other.x - pos.x) < 70.0 and absf(other.y - pos.y) < font_size + 4.0:
+				pos.y = other.y - font_size - 4.0
+				moved = true
+	recent_popups.append([pos, 0.7])
 	Effects.popup(self, pos, str(points), color, font_size)
 	_update_hud()
+
+
+## Cheers when one shot wrecks a lot.
+func _count_combo() -> void:
+	if state != State.PLAYING or not launched_any:
+		return
+	combo += 1
+	var cheers := {4: "Nice!", 8: "Great!", 12: "Wrecked!", 18: "Mega Wreck!", 25: "Total Chaos!"}
+	if cheers.has(combo):
+		var at := camera.get_screen_center_position() + Vector2(0, -170) / base_zoom
+		Effects.popup(self, at, cheers[combo], Color(1.0, 0.85, 0.2), int(40 / base_zoom))
+		Sfx.play("ability", -6.0, 1.0 + combo * 0.02)
 
 
 func _win() -> void:

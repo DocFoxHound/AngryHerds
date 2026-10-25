@@ -16,6 +16,16 @@ var is_boss := false
 ## 0..1, how far the jaw is open; decays after a growl or laugh.
 var growl := 0.0
 var growl_timer := 0.0
+## Animation: blinks, a wince and white flash after a hit, laughing, panic as an animal flies
+## close, and where it's looking (in its own frame).
+var anim_time := 0.0
+var blink_left := 0.0
+var blink_timer := 0.0
+var wince := 0.0
+var flash := 0.0
+var laughing := 0.0
+var panic := 0.0
+var look := Vector2(-0.6, 0.0)
 
 
 func _ready() -> void:
@@ -39,6 +49,8 @@ func _ready() -> void:
 	physics_material_override = material
 	body_entered.connect(_on_body_entered)
 	growl_timer = randf_range(2.0, 9.0)
+	anim_time = randf() * 10.0
+	blink_timer = randf_range(1.0, 4.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -49,7 +61,39 @@ func _physics_process(delta: float) -> void:
 		snarl()
 	if growl > 0.0:
 		growl = maxf(growl - delta * 1.2, 0.0)
-		queue_redraw()
+
+
+## Expressions: watches the nearest animal, panics when one is flying in.
+func _process(delta: float) -> void:
+	anim_time += delta
+	blink_left -= delta
+	blink_timer -= delta
+	if blink_timer <= 0.0:
+		blink_timer = randf_range(2.0, 5.0)
+		blink_left = 0.12
+	wince = maxf(wince - delta, 0.0)
+	flash = maxf(flash - delta * 6.0, 0.0)
+	laughing = maxf(laughing - delta, 0.0)
+	var nearest: Node2D = null
+	var best := INF
+	var danger := 0.0
+	for animal: Node2D in get_tree().get_nodes_in_group("herd"):
+		if not animal.visible:
+			continue
+		var offset := animal.global_position - global_position
+		var dist := offset.length()
+		if dist < best:
+			best = dist
+			nearest = animal
+		if animal.flight_time >= 0.0 and not animal.done and dist < 320.0 * size:
+			# Closing in?
+			if animal.linear_velocity.dot(-offset) > 0.0:
+				danger = maxf(danger, 1.0 - dist / (320.0 * size))
+	panic = move_toward(panic, 1.0 if danger > 0.0 else 0.0, delta * (6.0 if danger > 0.0 else 1.5))
+	if nearest:
+		var want := (nearest.global_position - global_position).normalized().rotated(-rotation)
+		look = look.lerp(want, 1.0 - exp(-delta * 8.0))
+	queue_redraw()
 
 
 ## Bares its teeth with a growl (bosses roar).
@@ -64,6 +108,7 @@ func snarl() -> void:
 
 func laugh() -> void:
 	growl = 1.0
+	laughing = 1.6
 	growl_timer = randf_range(4.0, 9.0)
 	queue_redraw()
 
@@ -88,6 +133,9 @@ func take_damage(amount: float) -> void:
 		Effects.popup(get_parent(), global_position + Vector2(0, -30 * size), "Clang!", Color(0.9, 0.9, 1.0), 22)
 		queue_redraw()
 	super(amount)
+	if amount > 5.0:
+		wince = 0.45
+		flash = 1.0
 
 
 func _break() -> void:
@@ -98,7 +146,20 @@ func _break() -> void:
 
 
 func _draw() -> void:
-	Art.wolf(self, variant, Vector2.ZERO, size, 0.0, damage_ratio(), growl, armor > 0.0)
+	var mood := "smug"
+	var at := Vector2.ZERO
+	if wince > 0.0:
+		mood = "wince"
+	elif laughing > 0.0:
+		mood = "laugh"
+		at = Vector2(0, -absf(sin(anim_time * 18.0)) * 3.0 * size)
+	elif panic > 0.3:
+		mood = "panic"
+		at = Vector2(sin(anim_time * 60.0) * 1.2 * size, 0)
+	var breath := sin(anim_time * 2.6) * 0.03 + wince * 0.15
+	var pose := {"mood": mood, "look": look * (0.4 if mood == "panic" else 0.9),
+		"blink": 1.0 if blink_left > 0.0 else 0.0, "squash": Vector2(1.0 + breath, 1.0 - breath), "flash": flash}
+	Art.wolf(self, variant, at, size, 0.0, damage_ratio(), growl, armor > 0.0, false, pose)
 	draw_set_transform(Vector2.ZERO)
 	# Tough wolves show how hurt they are.
 	if max_health >= 200.0 and not is_boss and damage_ratio() > 0.0:

@@ -15,6 +15,8 @@ var step_phase := 0.0
 var jump := 0.0
 var growl := 0.0
 var line := ""
+var blink_left := 0.0
+var blink_timer := randf_range(1.0, 4.0)
 
 
 func _process(delta: float) -> void:
@@ -22,6 +24,11 @@ func _process(delta: float) -> void:
 		step_phase += delta * 14.0
 	jump = maxf(jump - delta * 2.5, 0.0)
 	growl = maxf(growl - delta * 0.8, 0.0)
+	blink_left -= delta
+	blink_timer -= delta
+	if blink_timer <= 0.0:
+		blink_timer = randf_range(2.0, 5.0)
+		blink_left = 0.12
 	queue_redraw()
 
 
@@ -43,15 +50,17 @@ func _draw() -> void:
 	var tilt := sin(step_phase) * 0.08 if walking else 0.0
 	draw_set_transform(Vector2.ZERO)
 	draw_colored_polygon(Art._ellipse(Vector2(0, -2), r * 0.9, 5.0), Color(0, 0, 0, 0.2))
+	var pose := {"blink": 1.0 if blink_left > 0.0 else 0.0, "look": Vector2(0.6, 0.0)}
 	if is_wolf():
 		var variant := kind.trim_prefix("wolf:")
 		var scale := SCALE * float(Catalog.WOLVES[variant].size)
-		Art.wolf(self, variant, at, scale, tilt, 0.0, maxf(growl, 0.35 if mood == "angry" else 0.0), true, face < 0)
+		pose.mood = "panic" if mood == "scared" else "smug"
+		Art.wolf(self, variant, at, scale, tilt, 0.0, maxf(growl, 0.35 if mood == "angry" else 0.0), true, face < 0, pose)
 		if mood == "scared":
 			draw_set_transform(Vector2.ZERO)
 			draw_circle(at + Vector2(r * 0.7, -r * 0.6), 4.0, Color(0.6, 0.85, 1.0))
 	else:
-		Art.animal(self, kind, at, SCALE * Catalog.animal_size(kind), tilt, mood, face < 0)
+		Art.animal(self, kind, at, SCALE * Catalog.animal_size(kind), tilt, mood, face < 0, pose)
 	if line != "":
 		_bubble(Vector2(0, -r * 2.0 - lift - 24.0))
 
