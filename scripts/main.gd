@@ -1,144 +1,385 @@
 extends Node2D
-## Builds the level, feeds animals to the slingshot, and tracks win/lose.
+## Plays one level: builds it from Levels, lines up the player's herd, keeps score, runs the
+## camera, and decides win or loss.
 
 const Animal := preload("res://scripts/animal.gd")
 const Block := preload("res://scripts/block.gd")
 const Wolf := preload("res://scripts/wolf.gd")
 const Slingshot := preload("res://scripts/slingshot.gd")
+const Hud := preload("res://scripts/hud.gd")
+const Background := preload("res://scripts/background.gd")
+const Terrain := preload("res://scripts/terrain.gd")
+const Pools := preload("res://scripts/pools.gd")
+const Trail := preload("res://scripts/trail.gd")
+const Debris := preload("res://scripts/debris.gd")
+const Effects := preload("res://scripts/effects.gd")
+const Levels := preload("res://scripts/levels.gd")
+const Areas := preload("res://scripts/areas.gd")
+const Catalog := preload("res://scripts/catalog.gd")
 
-const GROUND_Y := 640.0
-const HERD := ["sheep", "cow", "goat", "sheep", "cow"]
+const GROUND_Y := Levels.GROUND_Y
+const SLINGSHOT_X := Levels.SLING_X
+const SPARE_ANIMAL_POINTS := 10000
+const VIEW_SIZE := Vector2(1280, 720)
 
+enum State { PLAYING, WON, LOST }
+
+var level: Dictionary
+var area: Dictionary
 var slingshot: Slingshot
-var herd_index := 0
+var hud: Hud
+var camera: Camera2D
+var trail: Trail
+var terrain: Terrain
+var pools: Pools
+var boss: Wolf
+## Animals still waiting their turn, lined up behind the slingshot.
+var waiting: Array[Animal] = []
+## Launched animals (and ducklings) that haven't settled yet.
+var in_flight: Array[Animal] = []
+## The last animal fired: the one a mid-flight click acts on.
+var flier: Animal
+var loading := false
+var launched_any := false
+var state := State.PLAYING
+var results_shown := false
+var score := 0
+## Score when the current shot was fired, to notice a complete miss.
+var score_at_launch := 0
 var wolves_left := 0
-var game_over := false
-var status_label: Label
-var message_label: Label
+var wolf_points := 0
+var block_points := 0
+var level_right := 0.0
+var level_top := GROUND_Y
+var rest_position := VIEW_SIZE / 2.0
+var trauma := 0.0
+var trail_tick := 0
 
 
 func _ready() -> void:
-	RenderingServer.set_default_clear_color(Color(0.55, 0.80, 0.95))
-	_build_ground()
+	add_to_group("camera_shake")
+	level = Levels.build(Game.current_level)
+	area = Areas.AREAS[level.area]
+	var sky: Array = area.sky
+	RenderingServer.set_default_clear_color(sky[1])
+	var background := Background.new()
+	background.setup(area, Game.current_level)
+	add_child(background)
+	terrain = Terrain.new()
+	terrain.setup(level, area)
+	add_child(terrain)
+	Debris.floor_at = terrain.floor_y
+	pools = Pools.new()
+	pools.pools = level.pools
+	add_child(pools)
 	_build_level()
+	trail = Trail.new()
+	add_child(trail)
 	slingshot = Slingshot.new()
-	slingshot.position = Vector2(220, GROUND_Y - Slingshot.HEIGHT)
+	slingshot.position = Vector2(SLINGSHOT_X, GROUND_Y - level.sling - Slingshot.HEIGHT)
 	slingshot.launched.connect(_on_launched)
 	add_child(slingshot)
-	_build_hud()
+	_build_camera()
+	hud = Hud.new()
+	hud.slots = level.slots
+	hud.retry_pressed.connect(_restart)
+	hud.next_pressed.connect(func() -> void: Game.next_after(Game.current_level))
+	hud.map_pressed.connect(func() -> void: Game.open_map(level.area, true))
+	hud.skip_pressed.connect(func() -> void: Game.skip(Game.current_level))
+	hud.herd_changed.connect(_on_herd_changed)
+	add_child(hud)
+	_line_up_herd()
+	_update_hud()
+	var title := "%s   %s" % [Levels.label(Game.current_level), area.name]
+	if boss:
+		title = "Boss: %s!" % Catalog.WOLVES[boss.variant].name
+		Sfx.play("boss")
+		_wait(1.2).timeout.connect(func() -> void: if is_instance_valid(boss): boss.snarl())
+	hud.show_banner(title)
+	if Game.announce_animal != "":
+		hud.open_herd(Game.announce_animal)
+		Game.announce_animal = ""
 	_load_next_animal()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		get_tree().reload_current_scene()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R:
+			_restart()
+		elif event.keycode == KEY_ESCAPE:
+			if hud.is_menu_open() and not results_shown:
+				hud.hide_overlay()
+			elif not results_shown:
+				hud.show_pause()
+		elif event.keycode == KEY_SPACE:
+			_try_ability()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_try_ability()
 
 
-func _build_ground() -> void:
-	var ground := StaticBody2D.new()
-	ground.position = Vector2(640, GROUND_Y + 100)
-	var shape := RectangleShape2D.new()
-	shape.size = Vector2(3200, 200)
-	var collision := CollisionShape2D.new()
-	collision.shape = shape
-	ground.add_child(collision)
-	var grass := ColorRect.new()
-	grass.color = Color(0.35, 0.65, 0.25)
-	grass.size = shape.size
-	grass.position = -shape.size / 2.0
-	ground.add_child(grass)
-	add_child(ground)
+func _try_ability() -> void:
+	if is_instance_valid(flier) and flier.can_use_ability():
+		flier.use_ability()
+		get_viewport().set_input_as_handled()
+
+
+func _physics_process(_delta: float) -> void:
+	if is_instance_valid(flier) and not flier.done and flier.flight_time >= 0.0:
+		trail_tick += 1
+		if trail_tick % 3 == 0:
+			trail.add(flier.global_position)
+	if level.pools.is_empty():
+		return
+	for body in get_tree().get_nodes_in_group("destructible") + get_tree().get_nodes_in_group("herd"):
+		var pool := pools.pool_at(body.global_position)
+		if pool != "":
+			body.sink(pool == "lava")
+
+
+func _process(delta: float) -> void:
+	trauma = maxf(trauma - delta * 1.6, 0.0)
+	camera.offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 24.0 * trauma * trauma
+	# Lean toward the animal in flight, then drift back to the full view of the level.
+	var target := rest_position
+	if is_instance_valid(flier) and not flier.done and flier.flight_time >= 0.0:
+		target += ((flier.global_position - rest_position) * 0.3).clamp(Vector2(-60, -160), Vector2(240, 40))
+	camera.position = camera.position.lerp(target, 1.0 - exp(-delta * 3.0))
+	if is_instance_valid(boss):
+		hud.set_boss(Catalog.WOLVES[boss.variant].name, 1.0 - boss.damage_ratio())
+
+
+## Called through the "camera_shake" group (see Effects.shake).
+func shake(amount: float) -> void:
+	trauma = minf(trauma + amount, 1.0)
 
 
 func _build_level() -> void:
-	# Left hut: wooden posts and roof, a wolf inside and one on top.
-	_add_block(Vector2(780, GROUND_Y - 50), Vector2(20, 100), "wood")
-	_add_block(Vector2(860, GROUND_Y - 50), Vector2(20, 100), "wood")
-	_add_block(Vector2(820, GROUND_Y - 110), Vector2(130, 20), "wood")
-	_add_wolf(Vector2(820, GROUND_Y - Wolf.RADIUS))
-	_add_wolf(Vector2(820, GROUND_Y - 120 - Wolf.RADIUS))
-
-	# Right tower: stone base, ice floor, wooden top floor.
-	_add_block(Vector2(1010, GROUND_Y - 70), Vector2(24, 140), "stone")
-	_add_block(Vector2(1110, GROUND_Y - 70), Vector2(24, 140), "stone")
-	_add_block(Vector2(1060, GROUND_Y - 150), Vector2(150, 20), "ice")
-	_add_block(Vector2(1020, GROUND_Y - 200), Vector2(20, 80), "wood")
-	_add_block(Vector2(1100, GROUND_Y - 200), Vector2(20, 80), "wood")
-	_add_block(Vector2(1060, GROUND_Y - 250), Vector2(120, 20), "wood")
-	_add_wolf(Vector2(1060, GROUND_Y - Wolf.RADIUS))
-	_add_wolf(Vector2(1060, GROUND_Y - 160 - Wolf.RADIUS))
-
-
-func _add_block(pos: Vector2, size: Vector2, kind: String) -> void:
-	var block := Block.new()
-	block.configure(size, kind)
-	block.position = pos
-	add_child(block)
-
-
-func _add_wolf(pos: Vector2) -> void:
-	var wolf := Wolf.new()
-	wolf.position = pos
-	wolf.destroyed.connect(_on_wolf_destroyed)
-	add_child(wolf)
-	wolves_left += 1
+	for b in level.blocks:
+		var size := Vector2(b[2], b[3])
+		var block := Block.new()
+		block.configure(size, b[4], b[5])
+		block.position = Vector2(b[0], GROUND_Y - b[1] - size.y / 2.0)
+		block.destroyed.connect(_on_block_destroyed)
+		add_child(block)
+		block_points += block.points
+		level_right = maxf(level_right, b[0] + size.x / 2.0)
+		level_top = minf(level_top, GROUND_Y - b[1] - b[3])
+	for w in level.wolves:
+		var wolf := Wolf.new()
+		wolf.variant = w[2]
+		var radius := Catalog.wolf_radius(w[2])
+		wolf.position = Vector2(w[0], GROUND_Y - w[1] - radius)
+		wolf.destroyed.connect(_on_wolf_destroyed)
+		add_child(wolf)
+		if wolf.variant == level.boss:
+			boss = wolf
+		wolves_left += 1
+		wolf_points += wolf.points
+		level_right = maxf(level_right, w[0] + radius)
+		level_top = minf(level_top, GROUND_Y - w[1] - radius * 2.0)
 
 
-func _build_hud() -> void:
-	var hud := CanvasLayer.new()
-	add_child(hud)
-	status_label = Label.new()
-	status_label.position = Vector2(20, 16)
-	status_label.add_theme_font_size_override("font_size", 24)
-	hud.add_child(status_label)
-	message_label = Label.new()
-	message_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	message_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	message_label.grow_vertical = Control.GROW_DIRECTION_BOTH
-	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	message_label.add_theme_font_size_override("font_size", 40)
-	message_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	message_label.add_theme_constant_override("outline_size", 8)
-	hud.add_child(message_label)
-	_update_hud()
+func _build_camera() -> void:
+	# Zoom out to fit the whole level (wide or tall), keeping the ground near the bottom edge.
+	# The left edge leaves room for a long line of animals behind the slingshot.
+	var bottom := GROUND_Y + 80.0
+	var left := -40.0 if level.slots > 4 else 0.0
+	var needed := Vector2(level_right + 160.0 - left, bottom - (level_top - 90.0))
+	var zoom := minf(1.0, minf(VIEW_SIZE.x / needed.x, VIEW_SIZE.y / needed.y))
+	var view := VIEW_SIZE / zoom
+	rest_position = Vector2(left + view.x / 2.0, bottom - view.y / 2.0)
+	camera = Camera2D.new()
+	camera.zoom = Vector2.ONE * zoom
+	camera.position = rest_position
+	add_child(camera)
+	camera.make_current()
+
+
+func _line_up_herd() -> void:
+	var bounds := Rect2(-300, -3000, level_right + 900, 3000 + GROUND_Y + 300)
+	var herd := Game.lineup_for(level.slots)
+	for i in herd.size():
+		var animal := Animal.new()
+		animal.kind = herd[i]
+		animal.display_only = true
+		animal.bounds = bounds
+		animal.position = _herd_slot(i, animal.kind)
+		animal.settled.connect(_on_animal_settled)
+		animal.spawned.connect(_on_duckling_spawned)
+		add_child(animal)
+		waiting.append(animal)
+
+
+## The herd was edited before the first shot: swap in the new lineup.
+func _on_herd_changed() -> void:
+	if launched_any or state != State.PLAYING:
+		return
+	var loaded := slingshot.unload()
+	if loaded:
+		loaded.queue_free()
+	for animal in waiting:
+		animal.queue_free()
+	waiting.clear()
+	_line_up_herd()
+	if not loading:
+		_load_next_animal()
+
+
+## Hops the next animal in line up into the slingshot.
+func _load_next_animal() -> void:
+	if waiting.is_empty() or state != State.PLAYING:
+		return
+	loading = true
+	var animal: Animal = waiting[0]
+	var start := animal.global_position
+	var end := slingshot.global_position
+	var tween := create_tween()
+	tween.tween_method(func(t: float) -> void:
+		if is_instance_valid(animal):
+			animal.global_position = start.lerp(end, t) + Vector2(0, -sin(t * PI) * 70.0),
+		0.0, 1.0, 0.45)
+	await tween.finished
+	loading = false
+	if not is_instance_valid(animal) or not animal in waiting:
+		# The herd was swapped mid-hop.
+		if not waiting.is_empty() and slingshot.animal == null:
+			_load_next_animal()
+		return
+	waiting.erase(animal)
+	# The rest of the line shuffles up.
+	for i in waiting.size():
+		create_tween().tween_property(waiting[i], "global_position", _herd_slot(i, waiting[i].kind), 0.3).set_delay(i * 0.06)
+	animal.set_collidable(true)
+	slingshot.load_animal(animal)
+	hud.set_hint(animal.hint())
+
+
+func _herd_slot(index: int, kind: String) -> Vector2:
+	return Vector2(SLINGSHOT_X - 58 - index * 38, GROUND_Y - level.sling - Animal.RADIUS * Catalog.animal_size(kind))
 
 
 func _update_hud() -> void:
-	status_label.text = "Animals: %d    Wolves: %d    (R to restart)" % [HERD.size() - herd_index, wolves_left]
+	hud.set_status("%s   Score: %d   Wolves: %d" % [Levels.label(Game.current_level), score, wolves_left])
 
 
-func _load_next_animal() -> void:
-	var animal := Animal.new()
-	animal.kind = HERD[herd_index]
-	animal.settled.connect(_on_animal_settled)
-	add_child(animal)
-	slingshot.load_animal(animal)
+func _on_launched(animal: Animal) -> void:
+	in_flight.append(animal)
+	flier = animal
+	trail.clear()
+	launched_any = true
+	score_at_launch = score
+	hud.show_herd_button(false)
 
 
-func _on_launched(_animal: Node) -> void:
-	herd_index += 1
-	_update_hud()
+func _on_duckling_spawned(chick: Animal) -> void:
+	chick.settled.connect(_on_animal_settled)
+	in_flight.append(chick)
 
 
-func _on_animal_settled(animal: Node) -> void:
-	await get_tree().create_timer(0.6).timeout
+func _on_animal_settled(animal: Animal) -> void:
+	in_flight.erase(animal)
+	await _wait(0.6).timeout
 	if is_instance_valid(animal):
+		if animal.bounds.has_point(animal.global_position):
+			animal.poof()
 		animal.queue_free()
-	if game_over:
+	if state != State.PLAYING or loading or not in_flight.is_empty() or slingshot.animal != null:
 		return
-	if herd_index < HERD.size():
+	if score == score_at_launch:
+		_wolves_laugh()
+	if not waiting.is_empty():
 		_load_next_animal()
 		return
 	# Out of animals: give falling pieces a moment to finish the job.
-	await get_tree().create_timer(2.0).timeout
-	if not game_over:
-		game_over = true
-		message_label.text = "The wolves survived!\nPress R to try again"
+	await _wait(2.5).timeout
+	if state == State.PLAYING and in_flight.is_empty():
+		_lose()
 
 
-func _on_wolf_destroyed(_wolf: Node) -> void:
+func _wolves_laugh() -> void:
+	Sfx.play("laugh", -4.0, 1.0, 2000)
+	for wolf in get_tree().get_nodes_in_group("wolves"):
+		wolf.laugh()
+
+
+func _on_block_destroyed(block: Block) -> void:
+	_add_score(block.points, block.global_position, Color(1.0, 0.95, 0.65))
+	Effects.shake(self, 0.25 if block.kind in ["stone", "metal"] else 0.12)
+
+
+func _on_wolf_destroyed(wolf: Wolf) -> void:
 	wolves_left -= 1
+	_add_score(wolf.points, wolf.global_position + Vector2(0, -24), Color(1.0, 0.6, 0.2), 34 if not wolf.is_boss else 44)
+	Effects.shake(self, 0.8 if wolf.is_boss else 0.35)
+	if wolf == boss:
+		hud.set_boss("", 0.0)
+	if wolves_left == 0 and state == State.PLAYING:
+		_win()
+
+
+func _add_score(points: int, pos: Vector2, color: Color, font_size := 24) -> void:
+	if results_shown or state == State.LOST:
+		return
+	score += points
+	Effects.popup(self, pos, str(points), color, font_size)
 	_update_hud()
-	if wolves_left == 0 and not game_over:
-		game_over = true
-		message_label.text = "The herd wins!\nPress R to play again"
+
+
+func _win() -> void:
+	state = State.WON
+	slingshot.enabled = false
+	hud.set_hint("")
+	hud.show_herd_button(false)
+	# Let the wreckage finish falling (it still scores), then cash in the spare animals.
+	await _wait(1.8).timeout
+	var spares: Array[Animal] = []
+	var loaded := slingshot.unload()
+	if loaded:
+		spares.append(loaded)
+	spares.append_array(waiting)
+	waiting.clear()
+	for animal in spares:
+		await _wait(0.35).timeout
+		if is_instance_valid(animal):
+			_add_score(SPARE_ANIMAL_POINTS, animal.global_position + Vector2(0, -36), Color(0.6, 1.0, 0.6), 30)
+			animal.poof()
+			animal.queue_free()
+	await _wait(0.6).timeout
+	results_shown = true
+	var stars := _stars()
+	var is_best := Game.record(Game.current_level, score, stars)
+	Sfx.play("win")
+	hud.show_results(true, score, stars, Game.best_score(Game.current_level), is_best, true)
+
+
+func _lose() -> void:
+	state = State.LOST
+	results_shown = true
+	slingshot.enabled = false
+	hud.set_hint("")
+	_wolves_laugh()
+	Sfx.play("lose")
+	var tries := Game.record_loss(Game.current_level)
+	hud.show_results(false, score, 0, Game.best_score(Game.current_level), false, false, tries >= 2)
+
+
+## One star for winning, more for wrecking the place and keeping animals spare.
+func _stars() -> int:
+	var two := wolf_points + int(block_points * 0.3)
+	return 1 + int(score >= two) + int(score >= two + SPARE_ANIMAL_POINTS)
+
+
+func _restart() -> void:
+	get_tree().reload_current_scene()
+
+
+## A one-shot timer owned by this node, so a pending wait dies quietly when the scene changes.
+## Await its timeout signal.
+func _wait(seconds: float) -> Timer:
+	var timer := Timer.new()
+	timer.one_shot = true
+	timer.wait_time = seconds
+	add_child(timer)
+	timer.start()
+	timer.timeout.connect(timer.queue_free)
+	return timer

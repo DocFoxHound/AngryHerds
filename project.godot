@@ -5,12 +5,14 @@ config_version=5
 [application]
 
 config/name="AngryHerds"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [autoload]
 
 SlopPulse="*res://scripts/slop_pulse.gd"
+Game="*res://scripts/game.gd"
+Sfx="*res://scripts/sfx.gd"
 
 [display]
 
@@ -20,7 +22,10 @@ window/stretch/mode="canvas_items"
 
 [physics]
 
+common/physics_ticks_per_second=120
+
 2d/default_gravity=980.0
+2d/solver/solver_iterations=32
 
 [rendering]
 

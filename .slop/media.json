@@ -2,7 +2,12 @@
   "thumbnail": "thumbnail.png",
   "gallery": [
     { "image": "screenshots/aim.png", "caption": "Pull back the slingshot and aim at the wolves' hideouts" },
-    { "image": "screenshots/impact.png", "caption": "Knock their huts down" },
-    { "image": "screenshots/aftermath.png", "caption": "The herd wins!" }
+    { "image": "screenshots/story.png", "caption": "The wolves have taken the farm. Time for the herd to fight back!" },
+    { "image": "screenshots/egg.png", "caption": "Chickens drop exploding eggs" },
+    { "image": "screenshots/pirates.png", "caption": "Ducks split into three to take on the pirate wolves" },
+    { "image": "screenshots/boss.png", "caption": "Stampede the Wolf King's castle" },
+    { "image": "screenshots/map.png", "caption": "Travel across ten lands, from Sunny Farm to the Wolf King's Castle" },
+    { "image": "screenshots/herd.png", "caption": "New animals join the herd as you go" },
+    { "image": "screenshots/title.png", "caption": "Three save slots" }
   ]
 }

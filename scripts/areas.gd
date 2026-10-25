@@ -1,0 +1,98 @@
+## The ten areas of the journey, ten levels each: look, terrain, building materials and wolves.
+##   style: terrain and scenery generator (see Levels and Background)
+##   mats / hard_mats: building materials, hard ones get likelier later in the area
+##   wolves / late_wolves: variants for the first and second half of the area
+##   platform: look of static ledges and pillars that structures can sit on
+
+const AREAS := [
+	{
+		"name": "Sunny Farm", "style": "farm",
+		"sky": [Color(0.45, 0.72, 0.95), Color(0.75, 0.9, 0.98)],
+		"grass": Color(0.38, 0.68, 0.27), "dirt": Color(0.47, 0.33, 0.2),
+		"hills": [Color(0.58, 0.78, 0.55), Color(0.47, 0.72, 0.4)],
+		"mats": ["wood", "wood", "redwood"], "hard_mats": ["stone"],
+		"wolves": ["pup", "wolf"], "late_wolves": ["wolf", "wolf", "big"],
+		"boss": "boss_farm", "platform": "rock", "map": Color(0.5, 0.78, 0.35),
+	},
+	{
+		"name": "Whispering Woods", "style": "forest",
+		"sky": [Color(0.5, 0.75, 0.85), Color(0.78, 0.9, 0.88)],
+		"grass": Color(0.24, 0.5, 0.22), "dirt": Color(0.36, 0.26, 0.16),
+		"hills": [Color(0.3, 0.52, 0.35), Color(0.22, 0.45, 0.25)],
+		"mats": ["wood", "wood", "redwood"], "hard_mats": ["stone"],
+		"wolves": ["wolf"], "late_wolves": ["wolf", "big"],
+		"boss": "boss_forest", "platform": "stump", "map": Color(0.2, 0.5, 0.25),
+	},
+	{
+		"name": "Willow River", "style": "river",
+		"sky": [Color(0.55, 0.78, 0.92), Color(0.82, 0.92, 0.95)],
+		"grass": Color(0.42, 0.62, 0.3), "dirt": Color(0.42, 0.32, 0.22),
+		"hills": [Color(0.55, 0.72, 0.6), Color(0.45, 0.65, 0.45)],
+		"mats": ["wood", "ice", "wood"], "hard_mats": ["stone", "ice"],
+		"wolves": ["wolf", "fisher"], "late_wolves": ["fisher", "big"],
+		"boss": "boss_river", "platform": "pier", "pool": "water", "map": Color(0.35, 0.65, 0.75),
+	},
+	{
+		"name": "Red Rock Canyon", "style": "canyon",
+		"sky": [Color(0.95, 0.65, 0.4), Color(1.0, 0.88, 0.65)],
+		"grass": Color(0.85, 0.6, 0.35), "dirt": Color(0.68, 0.38, 0.22),
+		"hills": [Color(0.85, 0.5, 0.35), Color(0.75, 0.42, 0.28)],
+		"mats": ["wood", "stone"], "hard_mats": ["stone", "metal"],
+		"wolves": ["bandit", "wolf"], "late_wolves": ["bandit", "hardhat", "big"],
+		"boss": "boss_canyon", "platform": "mesa", "map": Color(0.85, 0.5, 0.3),
+	},
+	{
+		"name": "Frostbite Peaks", "style": "peaks",
+		"sky": [Color(0.55, 0.7, 0.9), Color(0.85, 0.92, 1.0)],
+		"grass": Color(0.95, 0.97, 1.0), "dirt": Color(0.55, 0.6, 0.7),
+		"hills": [Color(0.75, 0.82, 0.92), Color(0.65, 0.72, 0.85)],
+		"mats": ["ice", "ice", "wood"], "hard_mats": ["stone"],
+		"wolves": ["snow", "wolf"], "late_wolves": ["snow", "big"],
+		"boss": "boss_peaks", "platform": "cliff", "weather": "snow", "map": Color(0.88, 0.93, 1.0),
+	},
+	{
+		"name": "Pirate Cove", "style": "beach",
+		"sky": [Color(0.35, 0.7, 0.98), Color(0.75, 0.92, 1.0)],
+		"grass": Color(0.95, 0.86, 0.58), "dirt": Color(0.82, 0.7, 0.45),
+		"hills": [Color(0.4, 0.65, 0.4), Color(0.3, 0.58, 0.35)],
+		"mats": ["wood", "redwood", "wood"], "hard_mats": ["stone", "wood"],
+		"wolves": ["pirate"], "late_wolves": ["pirate", "captain"],
+		"boss": "boss_pirate", "platform": "pier", "pool": "water", "map": Color(0.95, 0.85, 0.55),
+	},
+	{
+		"name": "Wolf City", "style": "city",
+		"sky": [Color(0.6, 0.68, 0.8), Color(0.88, 0.85, 0.82)],
+		"grass": Color(0.5, 0.5, 0.52), "dirt": Color(0.3, 0.3, 0.33),
+		"hills": [Color(0.55, 0.6, 0.7), Color(0.45, 0.5, 0.6)],
+		"mats": ["glass", "wood", "glass"], "hard_mats": ["metal", "stone"],
+		"wolves": ["suit", "hardhat"], "late_wolves": ["suit", "hardhat", "big"],
+		"boss": "boss_city", "platform": "building", "map": Color(0.6, 0.62, 0.68),
+	},
+	{
+		"name": "Moonlit Graveyard", "style": "graveyard",
+		"sky": [Color(0.1, 0.08, 0.25), Color(0.35, 0.25, 0.45)],
+		"grass": Color(0.22, 0.32, 0.25), "dirt": Color(0.2, 0.17, 0.18),
+		"hills": [Color(0.18, 0.15, 0.28), Color(0.14, 0.12, 0.22)],
+		"mats": ["stone", "wood"], "hard_mats": ["stone", "metal"],
+		"wolves": ["ghost", "wolf"], "late_wolves": ["ghost", "big"],
+		"boss": "boss_graveyard", "platform": "crypt", "weather": "fireflies", "night": true, "map": Color(0.35, 0.28, 0.45),
+	},
+	{
+		"name": "Mount Scorch", "style": "volcano",
+		"sky": [Color(0.3, 0.1, 0.1), Color(0.85, 0.42, 0.2)],
+		"grass": Color(0.3, 0.24, 0.22), "dirt": Color(0.18, 0.13, 0.12),
+		"hills": [Color(0.35, 0.18, 0.15), Color(0.25, 0.14, 0.12)],
+		"mats": ["stone", "metal"], "hard_mats": ["metal"],
+		"wolves": ["magma", "wolf"], "late_wolves": ["magma", "knight"],
+		"boss": "boss_volcano", "platform": "basalt", "pool": "lava", "weather": "embers", "map": Color(0.6, 0.22, 0.15),
+	},
+	{
+		"name": "Wolf King's Castle", "style": "castle",
+		"sky": [Color(0.3, 0.32, 0.45), Color(0.62, 0.62, 0.72)],
+		"grass": Color(0.32, 0.42, 0.3), "dirt": Color(0.28, 0.25, 0.22),
+		"hills": [Color(0.38, 0.4, 0.5), Color(0.3, 0.33, 0.42)],
+		"mats": ["stone", "redwood"], "hard_mats": ["metal", "stone"],
+		"wolves": ["knight", "wolf"], "late_wolves": ["knight", "big", "captain"],
+		"boss": "boss_castle", "platform": "rampart", "pool": "water", "map": Color(0.4, 0.4, 0.5),
+	},
+]
