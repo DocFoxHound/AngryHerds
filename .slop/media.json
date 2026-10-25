@@ -1,0 +1,8 @@
+{
+  "thumbnail": "thumbnail.png",
+  "gallery": [
+    { "image": "screenshots/aim.png", "caption": "Pull back the slingshot and aim at the wolves' hideouts" },
+    { "image": "screenshots/impact.png", "caption": "Knock their huts down" },
+    { "image": "screenshots/aftermath.png", "caption": "The herd wins!" }
+  ]
+}

@@ -1,0 +1,22 @@
+# .github/workflows/slop.yml
+name: Slop Build
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  slop:
+    uses: DocFoxHound/slop-build/.github/workflows/build.yml@v1
+    with:
+      app: angryherds
+      slop-url: https://slopai.games
+      project-type: godot
+      godot-version: "4.7.2"
+      godot-preset-windows: Windows
