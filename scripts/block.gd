@@ -14,6 +14,11 @@ const KINDS := {
 	"metal": {"color": Color(0.6, 0.63, 0.7), "health": 1600.0, "density": 2.0, "points": 1000, "breaks": "stone", "hit": "clang", "smash": "clang"},
 }
 
+## Blocks soak up part of each knock, and no single knock breaks a fresh one, so hit pieces fly
+## and tumble first and break when they crash into something.
+const IMPACT_DAMAGE := 0.8
+const MAX_HIT := 0.6
+
 var size := Vector2(20, 100)
 var color := Color.WHITE
 var kind := "wood"
@@ -28,6 +33,8 @@ func configure(p_size: Vector2, p_kind: String, p_shape := "rect") -> void:
 	color = data.color
 	max_health = data.health
 	damage_threshold = 150.0
+	impact_damage = IMPACT_DAMAGE
+	max_hit = MAX_HIT
 	var area := size.x * size.y
 	if shape == "tri":
 		area *= 0.5

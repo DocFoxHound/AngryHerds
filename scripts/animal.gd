@@ -13,9 +13,17 @@ const Art := preload("res://scripts/art.gd")
 
 const RADIUS := 22.0
 ## The animal counts as stopped after moving slower than this for STILL_SECONDS.
-const STILL_SPEED := 15.0
-const STILL_SECONDS := 1.0
-const MAX_FLIGHT_SECONDS := 10.0
+const STILL_SPEED := 30.0
+const STILL_SECONDS := 0.5
+const MAX_FLIGHT_SECONDS := 8.0
+## Once it touches the ground the animal gets rolling resistance, and its turn ends once it has
+## only been trundling along (slower than SLOW_SPEED) for SLOW_SECONDS, or ROLL_SECONDS after
+## landing. Blocks and wolves don't count, so it keeps its follow-through when crashing into them.
+const ROLL_DAMP := 1.2
+const ROLL_ANGULAR_DAMP := 4.0
+const SLOW_SPEED := 160.0
+const SLOW_SECONDS := 1.0
+const ROLL_SECONDS := 4.0
 const DASH_SPEED := 1400.0
 const POUND_SPEED := 1500.0
 const STAMPEDE_SPEED := 1100.0
@@ -30,6 +38,9 @@ var display_only := false
 var bounds := Rect2(-300, -3000, 2200, 3940)
 var flight_time := -1.0
 var still_time := 0.0
+var slow_time := 0.0
+## Seconds since it first touched the ground, or -1 before then.
+var landed_time := -1.0
 var done := false
 var ability_used := false
 var size := 1.0
@@ -167,9 +178,14 @@ func sink(lava: bool) -> void:
 	settled.emit(self)
 
 
-func _on_body_entered(_body: Node) -> void:
+func _on_body_entered(body: Node) -> void:
 	if flight_time < 0.0:
 		return
+	if landed_time < 0.0 and body is StaticBody2D:
+		landed_time = 0.0
+		linear_damp = ROLL_DAMP
+		angular_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+		angular_damp = ROLL_ANGULAR_DAMP
 	if pounding:
 		pounding = false
 		Effects.shake(self, 0.6)
@@ -202,7 +218,15 @@ func _physics_process(delta: float) -> void:
 			_blast()
 			return
 	still_time = still_time + delta if last_speed < STILL_SPEED else 0.0
-	if still_time > STILL_SECONDS or flight_time > MAX_FLIGHT_SECONDS or not bounds.has_point(global_position):
+	var rolling_over := false
+	if fuse > 0.0:
+		# A lit pig always gets to go off.
+		still_time = 0.0
+	elif landed_time >= 0.0:
+		landed_time += delta
+		slow_time = slow_time + delta if last_speed < SLOW_SPEED else 0.0
+		rolling_over = slow_time > SLOW_SECONDS or landed_time > ROLL_SECONDS
+	if still_time > STILL_SECONDS or rolling_over or flight_time > MAX_FLIGHT_SECONDS or not bounds.has_point(global_position):
 		done = true
 		settled.emit(self)
 

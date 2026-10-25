@@ -9,6 +9,11 @@ var max_health := 100.0
 var health := 100.0
 ## Contact impulses below this are ignored (resting weight, light bumps).
 var damage_threshold := 100.0
+## Share of an impact (above the threshold) that turns into damage.
+var impact_damage := 1.0
+## The most one physics step of impacts can take off, as a share of max_health. Below 1, a
+## single knock sends things tumbling instead of breaking them on the spot.
+var max_hit := INF
 ## Seconds after spawning during which damage is ignored, so the level can settle.
 var grace := 1.5
 ## Score for destroying it.
@@ -32,11 +37,14 @@ func _physics_process(delta: float) -> void:
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if grace > 0.0 or health <= 0.0:
 		return
+	var damage := 0.0
 	for i in state.get_contact_count():
 		var impulse = state.get_contact_impulse(i)
 		var magnitude: float = impulse.length() if impulse is Vector2 else float(impulse)
 		if magnitude > damage_threshold:
-			take_damage(magnitude - damage_threshold)
+			damage += (magnitude - damage_threshold) * impact_damage
+	if damage > 0.0:
+		take_damage(minf(damage, max_hit * max_health))
 
 
 func take_damage(amount: float) -> void:
