@@ -115,6 +115,11 @@ func _show_slots() -> void:
 		Game.set_sound(not Game.sound_on)
 		sound.text = "Sound: On" if Game.sound_on else "Sound: Off")
 	bottom.add_child(sound)
+	var screen := Ui.button("Fullscreen: On" if Game.fullscreen else "Fullscreen: Off", func() -> void: pass, Vector2(200, 46))
+	screen.pressed.connect(func() -> void:
+		Game.set_fullscreen(not Game.fullscreen)
+		screen.text = "Fullscreen: On" if Game.fullscreen else "Fullscreen: Off")
+	bottom.add_child(screen)
 	bottom.add_child(Ui.button("Quit", func() -> void: get_tree().quit(), Vector2(120, 46)))
 	box.add_child(bottom)
 	box.add_child(Ui.label(15, "Progress saves automatically as you play.", Color(0.85, 0.8, 0.7)))

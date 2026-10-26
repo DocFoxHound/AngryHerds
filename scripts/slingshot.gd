@@ -113,10 +113,14 @@ func _band(from: Vector2, to: Vector2, color: Color) -> void:
 func _draw_trajectory() -> void:
 	var gravity := Vector2(0, ProjectSettings.get_setting("physics/2d/default_gravity"))
 	var velocity := -pull * POWER
-	# A long dotted path, so it shows where even far shots come down.
+	# Keep the dots the same size on screen when the camera zooms out for big levels.
+	var grow := 1.0 / clampf(get_canvas_transform().get_scale().x, 0.4, 1.0)
+	# A long dotted path, so it shows where even far shots come down. White dots with a dark
+	# rim read on bright skies, snow and dark woods alike.
 	for i in range(1, 37):
 		var t := i * 0.06
 		var point := pull + velocity * t + 0.5 * gravity * t * t
-		var alpha := 0.85 - i * 0.018
-		draw_circle(point, 4.0, Color(0.2, 0.15, 0.1, alpha * 0.35))
-		draw_circle(point, 3.0, Color(1, 1, 1, alpha))
+		var alpha := 0.95 - i * 0.012
+		var radius := lerpf(3.6, 2.6, i / 36.0) * grow
+		draw_circle(point, radius + 1.6 * grow, Color(0.12, 0.08, 0.05, alpha * 0.75))
+		draw_circle(point, radius, Color(1, 1, 1, alpha))

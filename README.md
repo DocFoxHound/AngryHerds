@@ -17,6 +17,7 @@ Pick a save slot on the title screen (progress saves automatically, three slots)
 - Drag the animal back from the slingshot and release to fire
 - Click (or Space) mid-flight to use the animal's ability
 - R restarts the level, Esc pauses
+- The game opens fullscreen and keeps the cursor inside it; F11 or Alt+Enter (or the button on the title screen) switches to a window
 - The Herd button (on the map, or before your first shot in a level) sets your lineup, which carries over between levels
 - Stuck? After losing a level twice you can skip it, and come back for its stars later
 

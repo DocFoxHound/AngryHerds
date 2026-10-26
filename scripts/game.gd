@@ -18,6 +18,8 @@ const ENDING := 10
 ## Save slot in use, 1..SLOTS.
 var slot := 1
 var sound_on := true
+## Fullscreen by default so stray clicks can't land outside the game; F11 or Alt+Enter toggles.
+var fullscreen := true
 ## Level being played, 1..100.
 var current_level := 1
 var lineup: Array = []
@@ -48,8 +50,30 @@ func _ready() -> void:
 	unlock_all = "--unlock-all" in OS.get_cmdline_user_args()
 	var settings := ConfigFile.new()
 	if settings.load(SETTINGS_PATH) == OK:
-		set_sound(settings.get_value("audio", "sound", true))
+		sound_on = settings.get_value("audio", "sound", true)
+		fullscreen = settings.get_value("display", "fullscreen", true)
+	AudioServer.set_bus_mute(0, not sound_on)
+	# Exported games open fullscreen (project.godot); tools (--script) render at the 1280x720
+	# window size, so they stay windowed.
+	if "--script" in OS.get_cmdline_args() or "--windowed" in OS.get_cmdline_args():
+		fullscreen = false
+	else:
+		_apply_fullscreen()
 	load_slot(1)
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F11 or (event.keycode == KEY_ENTER and event.alt_pressed):
+			set_fullscreen(not fullscreen)
+			get_viewport().set_input_as_handled()
+
+
+## Fullscreen also keeps the cursor inside the window, so a click on a second screen can't
+## pull the game out of focus.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN and fullscreen:
+		Input.mouse_mode = Input.MOUSE_MODE_CONFINED
 
 
 func slot_path(n: int) -> String:
@@ -108,8 +132,43 @@ func delete_slot(n: int) -> void:
 func set_sound(on: bool) -> void:
 	sound_on = on
 	AudioServer.set_bus_mute(0, not on)
+	_save_settings()
+
+
+func set_fullscreen(on: bool) -> void:
+	fullscreen = on
+	_apply_fullscreen()
+	_save_settings()
+
+
+func _apply_fullscreen() -> void:
+	if fullscreen:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		Input.mouse_mode = Input.MOUSE_MODE_CONFINED
+		return
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
+		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	# Having opened fullscreen, the window keeps the whole screen's size and some desktops
+	# maximize it, so give it a proper window size once the switch has gone through.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if fullscreen:
+		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	var screen := DisplayServer.screen_get_usable_rect()
+	var size := Vector2i(1280, 720)
+	if screen.size.x > 1700 and screen.size.y > 1000:
+		size = Vector2i(1600, 900)
+	DisplayServer.window_set_size(size)
+	DisplayServer.window_set_position(screen.position + (screen.size - size) / 2)
+
+
+func _save_settings() -> void:
 	var settings := ConfigFile.new()
-	settings.set_value("audio", "sound", on)
+	settings.set_value("audio", "sound", sound_on)
+	settings.set_value("display", "fullscreen", fullscreen)
 	settings.save(SETTINGS_PATH)
 
 
