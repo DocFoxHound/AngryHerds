@@ -79,7 +79,7 @@ func _ready() -> void:
 	info_label.custom_minimum_size = Vector2(620, 26)
 	box.add_child(info_label)
 	var buttons := Ui.row()
-	buttons.add_child(Ui.button("Done", func() -> void: closed.emit()))
+	buttons.add_child(Ui.go_button("Done", func() -> void: closed.emit(), Vector2(200, 64)))
 	box.add_child(buttons)
 	_refresh()
 	_describe(announce if announce != "" else Game.lineup[0])

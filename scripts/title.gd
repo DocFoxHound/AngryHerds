@@ -104,7 +104,9 @@ func _show_slots() -> void:
 		name_label.custom_minimum_size = Vector2(300, 0)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.add_child(name_label)
-		row.add_child(Ui.button("Continue" if info.used else "New Game", _play.bind(n), Vector2(150, 46)))
+		var play := Ui.go_button("Play" if info.used else "New Game", _play.bind(n), Vector2(170, 52))
+		play.add_theme_font_size_override("font_size", 26)
+		row.add_child(play)
 		var delete := Ui.button("Delete", _confirm_delete.bind(n), Vector2(110, 46))
 		delete.disabled = not info.used
 		row.add_child(delete)

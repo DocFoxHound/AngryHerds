@@ -132,11 +132,11 @@ func open_herd(announce := "") -> void:
 func show_pause() -> void:
 	var box := _open_panel()
 	box.add_child(Ui.label(44, "Paused", Ui.GOLD))
+	var resume := Ui.go_button("Keep Playing", hide_overlay)
+	box.add_child(resume)
 	var buttons := Ui.row()
 	buttons.add_child(Ui.button("Map", func() -> void: map_pressed.emit()))
-	buttons.add_child(Ui.button("Retry", func() -> void: retry_pressed.emit()))
-	var resume := Ui.button("Resume", hide_overlay)
-	buttons.add_child(resume)
+	buttons.add_child(Ui.button("Restart", func() -> void: retry_pressed.emit()))
 	box.add_child(buttons)
 	box.add_child(Ui.label(17, "Drag back from the slingshot and let go. Click mid-flight for the animal's ability.\nR restarts, Esc pauses.", Color(0.9, 0.85, 0.75)))
 	resume.grab_focus.call_deferred()
@@ -159,13 +159,21 @@ func show_results(won: bool, score: int, stars: int, best: int, new_best: bool, 
 	box.add_child(Ui.label(30, "Score: %d" % score))
 	if won:
 		box.add_child(Ui.label(22, "New best!" if new_best else "Best: %d" % best, Color(0.6, 1.0, 0.6) if new_best else Color.WHITE))
-	var buttons := Ui.row()
-	buttons.add_child(Ui.button("Map", func() -> void: map_pressed.emit()))
-	buttons.add_child(Ui.button("Retry", func() -> void: retry_pressed.emit()))
+	# One big green button for the obvious next step, the rest small underneath.
+	var go: Button
 	if won and has_next:
-		var next := Ui.button("Next", func() -> void: next_pressed.emit())
-		buttons.add_child(next)
-		next.grab_focus.call_deferred()
+		go = Ui.go_button("Next Level", func() -> void: next_pressed.emit())
+	elif won:
+		go = Ui.go_button("Back to Map", func() -> void: map_pressed.emit())
+	else:
+		go = Ui.go_button("Try Again", func() -> void: retry_pressed.emit())
+	box.add_child(go)
+	go.grab_focus.call_deferred()
+	var buttons := Ui.row()
+	if has_next or not won:
+		buttons.add_child(Ui.button("Map", func() -> void: map_pressed.emit()))
+	if won:
+		buttons.add_child(Ui.button("Play Again", func() -> void: retry_pressed.emit(), Vector2(160, 50)))
 	if can_skip:
 		buttons.add_child(Ui.button("Skip level", func() -> void: skip_pressed.emit(), Vector2(160, 50)))
 	box.add_child(buttons)

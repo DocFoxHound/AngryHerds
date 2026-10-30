@@ -56,6 +56,37 @@ static func button(text: String, action: Callable, min_size := Vector2(140, 50))
 	return b
 
 
+## The big green button for the one thing to press next (Next, Try Again, Play...). It pulses
+## gently so it is the first thing a kid's eye lands on.
+static func go_button(text: String, action: Callable, min_size := Vector2(260, 78)) -> Button:
+	var b := button(text, action, min_size)
+	b.add_theme_stylebox_override("normal", _go_box(Color(0.25, 0.72, 0.25)))
+	b.add_theme_stylebox_override("hover", _go_box(Color(0.35, 0.84, 0.32)))
+	b.add_theme_stylebox_override("pressed", _go_box(Color(0.18, 0.55, 0.18)))
+	b.add_theme_font_size_override("font_size", 34)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(state, Color.WHITE)
+	b.add_theme_color_override("font_outline_color", Color(0.05, 0.25, 0.05))
+	b.add_theme_constant_override("outline_size", 8)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	b.resized.connect(func() -> void: b.pivot_offset = b.size / 2.0)
+	b.ready.connect(func() -> void:
+		var tween := b.create_tween().set_loops()
+		tween.tween_property(b, "scale", Vector2(1.06, 1.06), 0.6).set_trans(Tween.TRANS_SINE)
+		tween.tween_property(b, "scale", Vector2.ONE, 0.6).set_trans(Tween.TRANS_SINE))
+	return b
+
+
+static func _go_box(color: Color) -> StyleBoxFlat:
+	var style := box(color, 16)
+	style.border_color = Color(0.1, 0.4, 0.1)
+	style.set_border_width_all(4)
+	style.shadow_color = Color(0, 0, 0, 0.35)
+	style.shadow_size = 6
+	style.shadow_offset = Vector2(0, 4)
+	return style
+
+
 static func row(separation := 16) -> HBoxContainer:
 	var r := HBoxContainer.new()
 	r.alignment = BoxContainer.ALIGNMENT_CENTER
