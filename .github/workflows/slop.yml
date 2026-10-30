@@ -16,7 +16,7 @@ jobs:
     uses: DocFoxHound/slop-build/.github/workflows/build.yml@v1
     with:
       app: angryherds
-      slop-url: https://slopai.games
+      slop-url: https://slaporslop.games
       project-type: godot
       godot-version: "4.7.2"
       godot-preset-windows: Windows
